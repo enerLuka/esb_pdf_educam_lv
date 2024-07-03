@@ -1,6 +1,6 @@
 <script>
     import { read, utils } from "xlsx";
-    import { PDFDocument, rgb } from "pdf-lib";
+    import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
     import Dropzone from "svelte-file-dropzone";
     import JSZip from "jszip";
 
@@ -62,6 +62,9 @@
     }
 
     function splitStringAtNumber(input) {
+        if (!input) {
+            return "";
+        }
         // Regular expression to find the first occurrence of a number
         const regex = /\d/;
         const match = input.match(regex);
@@ -78,14 +81,25 @@
     }
 
     function convertDateString(dateString) {
+        if (!dateString) {
+            return "";
+        }
         // Split the date string by the '/' character
         const [month, day, year] = dateString.split("/");
 
+        // Pad single-digit day and month with leading zeros
+        const paddedDay = day.padStart(2, "0");
+        const paddedMonth = month.padStart(2, "0");
+        const paddedYear = year.padStart(2, "0");
+
         // Concatenate the parts into the desired format
-        return `${day}${month}${year}`;
+        return `${paddedDay}${paddedMonth}${paddedYear}`;
     }
 
     function splitSocialString(str) {
+        if (!str) {
+            return "";
+        }
         // Remove non-alphanumeric characters using regex
         const cleanStr = str.replace(/\W/g, "");
 
@@ -98,6 +112,9 @@
     }
 
     function formatPhoneNumber(phoneNumber) {
+        if (!phoneNumber) {
+            return "";
+        }
         // Remove all non-numeric characters using regex
         const cleaned = phoneNumber.replace(/\D/g, "");
 
@@ -130,180 +147,161 @@
             );
             console.log("dit is de employeeData", employeeData);
 
-            // Voeg tekst toe op een bepaalde positie in de PDF (x, y)
-            firstPage.drawText(`${employeeData.LastName}`, {
-                x: 73,
-                y: firstPage.getHeight() - 238,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
+            // Functie om undefined te checken en om te zetten naar een lege string
+            const safeText = (text) => (text !== undefined ? text : "");
 
-            firstPage.drawText(`${employeeData.FirstName}`, {
-                x: 93,
-                y: firstPage.getHeight() - 260,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
+            // Functie om hoofdletters te gebruiken
+            const toUpperCase = (text) =>
+                typeof text === "string" ? text.toUpperCase() : text;
 
-            firstPage.drawText(`${formatPhoneNumber(employeeData.Mobile1)}`, {
-                x: 411,
-                y: firstPage.getHeight() - 260,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
+            // // Functie om meer letter-spacing toe te voegen
+            // const letterSpacing = (text) => text.split("").join("  ");
+
+            const courierFont = await pdfDoc.embedFont(StandardFonts.Courier);
+
+            // Functie om tekst met letter-spacing toe te voegen
+            const drawText = (
+                page,
+                text,
+                x,
+                y,
+                spacing = 1.1,
+                size = 12,
+                color = rgb(0, 0, 0),
+                font = courierFont,
+            ) => {
+                const letters = toUpperCase(safeText(text)).split("");
+                let currentX = x;
+                for (const letter of letters) {
+                    page.drawText(letter, {
+                        x: currentX,
+                        y: y, // Y-waarde met 15 verlagen
+                        size,
+                        color,
+                    });
+                    currentX += size + spacing; // Vergroot x-coördinaat voor letter-spacing
+                }
+            };
+
+            drawText(
+                firstPage,
+                employeeData.LastName,
+                70,
+                firstPage.getHeight() - 243,
+            );
+            drawText(
+                firstPage,
+                employeeData.FirstName,
+                88,
+                firstPage.getHeight() - 265,
+            );
+            drawText(
+                firstPage,
+                formatPhoneNumber(employeeData.Mobile1),
+                408,
+                firstPage.getHeight() - 265,
+            );
 
             const streetAndNumber = splitStringAtNumber(employeeData.Street1);
-            firstPage.drawText(`${streetAndNumber[0]}`, {
-                x: 73,
-                y: firstPage.getHeight() - 274,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
+            drawText(
+                firstPage,
+                streetAndNumber[0],
+                70,
+                firstPage.getHeight() - 286,
+            );
+            drawText(
+                firstPage,
+                streetAndNumber[1],
+                390,
+                firstPage.getHeight() - 286,
+            );
+            drawText(
+                firstPage,
+                employeeData.Street2,
+                483,
+                firstPage.getHeight() - 286,
+            );
 
-            firstPage.drawText(`${streetAndNumber[1]}`, {
-                x: 396,
-                y: firstPage.getHeight() - 274,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
+            drawText(
+                firstPage,
+                employeeData.PostCode,
+                83,
+                firstPage.getHeight() - 308,
+            );
+            drawText(
+                firstPage,
+                employeeData.CityName,
+                222,
+                firstPage.getHeight() - 308,
+            );
+            drawText(
+                firstPage,
+                employeeData.CountryName,
+                470,
+                firstPage.getHeight() - 308,
+            );
 
-            firstPage.drawText(`${employeeData.Street2}`, {
-                x: 487,
-                y: firstPage.getHeight() - 274,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
+            drawText(
+                firstPage,
+                employeeData.BirthPlace,
+                110,
+                firstPage.getHeight() - 330,
+            );
 
-            firstPage.drawText(`${employeeData.PostCode}`, {
-                x: 88,
-                y: firstPage.getHeight() - 297,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-
-            firstPage.drawText(`${employeeData.CityName}`, {
-                x: 227,
-                y: firstPage.getHeight() - 297,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-
-            firstPage.drawText(`${employeeData.CountryName}`, {
-                x: 470,
-                y: firstPage.getHeight() - 297,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-
-            firstPage.drawText(`${employeeData.BirthPlace}`, {
-                x: 113,
-                y: firstPage.getHeight() - 320,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-
-            firstPage.drawText(`${convertDateString(employeeData.BirthDate)}`, {
-                x: 439,
-                y: firstPage.getHeight() - 320,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-
-            firstPage.drawText(`${convertDateString(employeeData.Email1)}`, {
-                x: 76,
-                y: firstPage.getHeight() - 340,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
+            drawText(
+                firstPage,
+                convertDateString(employeeData.BirthDate),
+                440,
+                firstPage.getHeight() - 330,
+            );
+            drawText(
+                firstPage,
+                employeeData.Email1,
+                70,
+                firstPage.getHeight() - 353,
+            );
 
             const socialNumbers = splitSocialString(
                 employeeData.SocialSecurityNumber,
             );
-            firstPage.drawText(`${socialNumbers[0]}`, {
-                x: 136,
-                y: firstPage.getHeight() - 362,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-
-            firstPage.drawText(`${socialNumbers[1]}`, {
-                x: 226,
-                y: firstPage.getHeight() - 362,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-
-            firstPage.drawText(`${socialNumbers[2]}`, {
-                x: 283,
-                y: firstPage.getHeight() - 362,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
+            drawText(
+                firstPage,
+                socialNumbers[0],
+                133,
+                firstPage.getHeight() - 374,
+            );
+            drawText(
+                firstPage,
+                socialNumbers[1],
+                223,
+                firstPage.getHeight() - 374,
+            );
+            drawText(
+                firstPage,
+                socialNumbers[2],
+                276,
+                firstPage.getHeight() - 374,
+            );
 
             let bName = "Enercon Services Belgium";
             let bVat = "0806283202";
             let bStreet = "Rue Du Progrès";
-            let bNumber = 1;
-            let bPostCode = 6220;
+            let bNumber = "1";
+            let bPostCode = "6220";
             let bPlace = "Fleurus";
             let bCountry = "BE";
             let bMail = "training-service-be@enercon.de";
             let bTel = "050350150";
 
-            firstPage.drawText(`${bName}`, {
-                x: 70,
-                y: firstPage.getHeight() - 566,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-            firstPage.drawText(`${bVat}`, {
-                x: 368,
-                y: firstPage.getHeight() - 566,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-            firstPage.drawText(`${bStreet}`, {
-                x: 73,
-                y: firstPage.getHeight() - 588,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-            firstPage.drawText(`${bNumber}`, {
-                x: 396,
-                y: firstPage.getHeight() - 588,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-            firstPage.drawText(`${bPostCode}`, {
-                x: 87,
-                y: firstPage.getHeight() - 610,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-            firstPage.drawText(`${bPlace}`, {
-                x: 221,
-                y: firstPage.getHeight() - 610,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-            firstPage.drawText(`${bCountry}`, {
-                x: 459,
-                y: firstPage.getHeight() - 610,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-            firstPage.drawText(`${bMail}`, {
-                x: 71,
-                y: firstPage.getHeight() - 630,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
-            firstPage.drawText(`${bTel}`, {
-                x: 368,
-                y: firstPage.getHeight() - 630,
-                size: 12,
-                color: rgb(0, 0, 0),
-            });
+            drawText(firstPage, bName, 70, firstPage.getHeight() - 580, 0.3);
+            drawText(firstPage, bVat, 369, firstPage.getHeight() - 580);
+            drawText(firstPage, bStreet, 70, firstPage.getHeight() - 598);
+            drawText(firstPage, bNumber, 394, firstPage.getHeight() - 598);
+            drawText(firstPage, bPostCode, 85, firstPage.getHeight() - 620);
+            drawText(firstPage, bPlace, 221, firstPage.getHeight() - 620);
+            drawText(firstPage, bCountry, 473, firstPage.getHeight() - 620);
+            drawText(firstPage, bMail, 71, firstPage.getHeight() - 643);
+            drawText(firstPage, bTel, 369, firstPage.getHeight() - 655);
 
             const pdfBytes = await pdfDoc.save();
             modifiedPdfs.push({
