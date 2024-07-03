@@ -134,7 +134,6 @@
     // Functie om geselecteerde rijen in de PDF's te vullen
     async function fillPDFs() {
         if (!pdfFile || selectedEmployees.length === 0) return;
-        console.log("were here!");
 
         modifiedPdfs = [];
         for (const employee of selectedEmployees) {
@@ -145,7 +144,6 @@
             const employeeData = excelData.find(
                 (item) => item["GUID"] == employee,
             );
-            console.log("dit is de employeeData", employeeData);
 
             // Functie om undefined te checken en om te zetten naar een lege string
             const safeText = (text) => (text !== undefined ? text : "");
@@ -285,10 +283,10 @@
 
             let bName = "Enercon Services Belgium";
             let bVat = "0806283202";
-            let bStreet = "Rue Du Progrès";
-            let bNumber = "1";
-            let bPostCode = "6220";
-            let bPlace = "Fleurus";
+            let bStreet = "Vlamingveld";
+            let bNumber = "43";
+            let bPostCode = "8490";
+            let bPlace = "Jabbeke";
             let bCountry = "BE";
             let bMail = "training-service-be@enercon.de";
             let bTel = "050350150";
@@ -317,7 +315,7 @@
         const zip = new JSZip();
         modifiedPdfs.forEach(({ employeeData, data }) => {
             zip.file(
-                `Modified_${employeeData.FirstName + employeeData.LastName}.pdf`,
+                `Educam_invuldocument_${employeeData.FirstName + employeeData.LastName}.pdf`,
                 data,
             );
         });
