@@ -7,12 +7,17 @@
     let excelData = [];
     let selectedEmployees = [];
     let pdfFile = null;
+    let pdf2File = null;
     let modifiedPdfs = [];
     let excelFiles = {
         accepted: [],
         rejected: [],
     };
     let pdfFiles = {
+        accepted: [],
+        rejected: [],
+    };
+    let pdf2Files = {
         accepted: [],
         rejected: [],
     };
@@ -59,6 +64,13 @@
         pdfFiles.accepted = [...pdfFiles.accepted, ...acceptedFiles];
         pdfFiles.rejected = [...pdfFiles.rejected, ...fileRejections];
         pdfFile = await pdfFiles.accepted[0].arrayBuffer();
+    }
+
+    async function handlePdf2FileSelect(e) {
+        const { acceptedFiles, fileRejections } = e.detail;
+        pdf2Files.accepted = [...pdf2Files.accepted, ...acceptedFiles];
+        pdf2Files.rejected = [...pdf2Files.rejected, ...fileRejections];
+        pdf2File = await pdf2Files.accepted[0].arrayBuffer();
     }
 
     function splitStringAtNumber(input) {
@@ -129,6 +141,137 @@
         }
 
         return formatted;
+    }
+
+    function getDatesForComingYear() {
+        const today = new Date();
+        const pastYear = today.getFullYear() - 1;
+        const futureYear = today.getFullYear() + 1;
+        const dates = [];
+
+        // Loop over the past and future year
+        for (let year = pastYear; year <= futureYear; year++) {
+            // Loop over each month (0 = January, ..., 11 = December)
+            for (let month = 0; month < 12; month++) {
+                // Determine the number of days in the current month
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+                // Loop over each day of the month
+                for (let day = 1; day <= daysInMonth; day++) {
+                    // Create a new Date object for the current date
+                    const date = new Date(year, month, day);
+                    // Format the date as "DD.MM.YYYY"
+                    const dayString = String(date.getDate()).padStart(2, "0");
+                    const monthString = String(date.getMonth() + 1).padStart(
+                        2,
+                        "0",
+                    );
+                    const yearString = date.getFullYear();
+                    dates.push(`${dayString}.${monthString}.${yearString}`);
+                }
+            }
+        }
+
+        return dates;
+    }
+
+    let selectDates = getDatesForComingYear();
+    let trainingDates = [];
+    $: console.log(trainingDates);
+
+    async function drawEmployeeNamesAndTrainingDates() {
+        if (!pdf2File || !selectedEmployees || !trainingDates) {
+            return;
+        }
+        const employeesPerPage = 12;
+        const datesPerPage = 5;
+
+        // Functie om undefined te checken en om te zetten naar een lege string
+        const safeText = (text) => (text !== undefined ? text : "");
+
+        // Functie om hoofdletters te gebruiken
+        const toUpperCase = (text) =>
+            typeof text === "string" ? text.toUpperCase() : text;
+
+        const drawAttendanceText = (
+            page,
+            text,
+            x,
+            y,
+            size = 9,
+            color = rgb(0, 0, 0),
+        ) => {
+            page.drawText(toUpperCase(safeText(text)), {
+                x,
+                y, // Y-waarde met 15 verlagen
+                size,
+                color,
+            });
+        };
+
+        let pdfCounter = 1;
+
+        for (let i = 0; i < selectedEmployees.length; i += employeesPerPage) {
+            for (let j = 0; j < trainingDates.length; j += datesPerPage) {
+                let usedPdfDoc = await PDFDocument.load(pdf2File);
+                console.log("usedPdfDoc", usedPdfDoc);
+                let pages = usedPdfDoc.getPages();
+                console.log("pages", pages);
+                let page = pages[0];
+                console.log("page", page);
+
+                let y = page.getHeight() - 218;
+
+                for (
+                    let k = i;
+                    k <
+                    Math.min(i + employeesPerPage, selectedEmployees.length);
+                    k++
+                ) {
+                    const employeeData = excelData.find(
+                        (item) => item["GUID"] == selectedEmployees[k],
+                    );
+                    const fullName = `${employeeData.LastName} ${employeeData.FirstName}`;
+                    drawAttendanceText(page, fullName, 120, y);
+
+                    let x = 370;
+                    for (
+                        let l = j;
+                        l < Math.min(j + datesPerPage, trainingDates.length);
+                        l++
+                    ) {
+                        drawAttendanceText(page, trainingDates[l], x, y);
+                        x += 80;
+                    }
+                    y -= 19;
+                }
+
+                // Format start and end dates
+                const startDate = trainingDates[j];
+                const endDate =
+                    trainingDates[
+                        Math.min(j + datesPerPage - 1, trainingDates.length - 1)
+                    ];
+
+                const numberOfDateRange = modifiedPdfs.filter((item) => {
+                    return (
+                        item?.employeeData &&
+                        item.employeeData.startDate == startDate &&
+                        item.employeeData.endDate == endDate
+                    );
+                }).length;
+
+                const pdfBytes = await usedPdfDoc.save();
+                modifiedPdfs.push({
+                    employeeData: {
+                        fileName: `Educam_attendance_${startDate}_${endDate}_${numberOfDateRange + 1}.pdf`,
+                        startDate,
+                        endDate,
+                    },
+                    data: new Blob([pdfBytes], { type: "application/pdf" }),
+                });
+            }
+        }
     }
 
     // Functie om geselecteerde rijen in de PDF's te vullen
@@ -308,14 +451,16 @@
             });
         }
 
-        console.log("we ended here", modifiedPdfs);
+        await drawEmployeeNamesAndTrainingDates();
 
         if (modifiedPdfs.length === 0) return;
 
         const zip = new JSZip();
         modifiedPdfs.forEach(({ employeeData, data }) => {
             zip.file(
-                `Educam_invuldocument_${employeeData.FirstName + employeeData.LastName}.pdf`,
+                employeeData.fileName
+                    ? employeeData.fileName
+                    : `Educam_info_form_${employeeData.FirstName + employeeData.LastName}.pdf`,
                 data,
             );
         });
@@ -333,10 +478,22 @@
 <div class="page">
     <div class="container">
         <h1>Educam Formulier Generator</h1>
-
+        <div>Stappenplan</div>
+        <ul>
+            <li>
+                Upload eerst de juiste bestanden (alledrie). Upload er één per
+                vakje.
+            </li>
+            <li>Selecteer zowel je werknemers als je trainingsdata</li>
+            <li>
+                Klik op de blauwe knop die nu onderaan verschijnt en je
+                downloadt een zip-file
+            </li>
+            <li>Refresh de pagina om opnieuw te beginnen</li>
+        </ul>
         <div class="dropzone">
             <Dropzone on:drop={handleExcelFileSelect}>
-                <p>Drop hier je Vario Excellijst met werknemers</p>
+                <p>Drop hier Excellijst met werknemersgegevens uit Vario</p>
             </Dropzone>
         </div>
         <ol>
@@ -353,12 +510,11 @@
                     >
                 {/each}
             </select>
-            <button on:click={fillPDFs}>Fill PDFs</button>
         {/if}
 
         <div class="dropzone">
             <Dropzone on:drop={handlePdfFileSelect}>
-                <p>Drop hier je Educam PDF formulier</p>
+                <p>Drop hier het Infofiche formulier (pdf)</p>
             </Dropzone>
         </div>
         <ol>
@@ -366,11 +522,44 @@
                 <li>{item.name}</li>
             {/each}
         </ol>
+
+        {#if pdf2File}
+            <div>
+                <div>Selecteer trainingsdata (ctrl + klik voor meerdere)</div>
+                <div style="font-size: 0.7em; color: red">
+                    Let op de jaartallen
+                </div>
+                <select id="dateInput" multiple bind:value={trainingDates}>
+                    {#each selectDates as selectDate}
+                        <option>{selectDate}</option>
+                    {/each}
+                </select>
+            </div>
+        {/if}
+
+        <div class="dropzone">
+            <Dropzone on:drop={handlePdf2FileSelect}>
+                <p>Drop hier het Aanwezigheidslijst formulier (pdf)</p>
+            </Dropzone>
+        </div>
+        <ol>
+            {#each pdf2Files.accepted as item}
+                <li>{item.name}</li>
+            {/each}
+        </ol>
+
+        {#if selectedEmployees.length && trainingDates.length}
+            <button on:click={fillPDFs}>Fill PDFs</button>
+        {/if}
     </div>
 </div>
 
 <style>
     /* Algemene stijlen voor de pagina */
+    #dateInput {
+        font-size: 0.8em;
+        height: 200px;
+    }
     .page {
         font-family: "Roboto", sans-serif;
         background-color: #f4f4f9;
@@ -450,24 +639,5 @@
 
     button:hover {
         background-color: #0056b3;
-    }
-
-    ul {
-        list-style-type: none;
-        padding: 0;
-    }
-
-    ul li {
-        margin: 10px 0;
-    }
-
-    ul li a {
-        text-decoration: none;
-        color: #007bff;
-        transition: color 0.3s;
-    }
-
-    ul li a:hover {
-        color: #0056b3;
     }
 </style>
