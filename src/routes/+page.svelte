@@ -143,37 +143,33 @@
         return formatted;
     }
 
-    function getDatesForComingYear() {
-        const today = new Date();
-        const pastYear = today.getFullYear() - 1;
-        const futureYear = today.getFullYear() + 1;
-        const dates = [];
+function getDatesForComingYear() {
+    const today = new Date();
+    const startMonth = today.getMonth() - 1;
+    const startDate = new Date(today.getFullYear(), startMonth, 1);
+    const endDate = new Date(today.getFullYear() + 1, 11, 31);
+    const dates = [];
 
-        // Loop over the past and future year
-        for (let year = pastYear; year <= futureYear; year++) {
-            // Loop over each month (0 = January, ..., 11 = December)
-            for (let month = 0; month < 12; month++) {
-                // Determine the number of days in the current month
-                const daysInMonth = new Date(year, month + 1, 0).getDate();
+    // Loop over each month from startDate to endDate
+    for (let date = startDate; date <= endDate; date.setMonth(date.getMonth() + 1)) {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-                // Loop over each day of the month
-                for (let day = 1; day <= daysInMonth; day++) {
-                    // Create a new Date object for the current date
-                    const date = new Date(year, month, day);
-                    // Format the date as "DD.MM.YYYY"
-                    const dayString = String(date.getDate()).padStart(2, "0");
-                    const monthString = String(date.getMonth() + 1).padStart(
-                        2,
-                        "0",
-                    );
-                    const yearString = date.getFullYear();
-                    dates.push(`${dayString}.${monthString}.${yearString}`);
-                }
-            }
+        // Loop over each day of the current month
+        for (let day = 1; day <= daysInMonth; day++) {
+            // Create a new Date object for the current date
+            const currentDate = new Date(year, month, day);
+            // Format the date as "DD.MM.YYYY"
+            const dayString = String(currentDate.getDate()).padStart(2, "0");
+            const monthString = String(currentDate.getMonth() + 1).padStart(2, "0");
+            const yearString = currentDate.getFullYear();
+            dates.push(`${dayString}.${monthString}.${yearString}`);
         }
-
-        return dates;
     }
+
+    return dates;
+}
 
     let selectDates = getDatesForComingYear();
     let trainingDates = [];
